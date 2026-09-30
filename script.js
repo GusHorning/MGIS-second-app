@@ -1,162 +1,189 @@
-/* style.css */
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+// script.js
+
+// DATA: Contains units, ratios relative to metric base, and system designations
+function getConversionData() {
+  return {
+    length: {
+      metricBase: 'm',
+      units: {
+        mm: { name: 'Millimeters (mm)', ratio: 0.001, system: 'metric' },
+        cm: { name: 'Centimeters (cm)', ratio: 0.01, system: 'metric' },
+        m: { name: 'Meters (m)', ratio: 1, system: 'metric' },
+        km: { name: 'Kilometers (km)', ratio: 1000, system: 'metric' },
+        in: { name: 'Inches (in)', ratio: 0.0254, system: 'imperial' },
+        ft: { name: 'Feet (ft)', ratio: 0.3048, system: 'imperial' },
+        yd: { name: 'Yards (yd)', ratio: 0.9144, system: 'imperial' },
+        mi: { name: 'Miles (mi)', ratio: 1609.344, system: 'imperial' }
+      }
+    },
+    mass: {
+      metricBase: 'g',
+      units: {
+        mg: { name: 'Milligrams (mg)', ratio: 0.001, system: 'metric' },
+        g: { name: 'Grams (g)', ratio: 1, system: 'metric' },
+        kg: { name: 'Kilograms (kg)', ratio: 1000, system: 'metric' },
+        oz: { name: 'Ounces (oz)', ratio: 28.349523125, system: 'imperial' },
+        lb: { name: 'Pounds (lb)', ratio: 453.59237, system: 'imperial' },
+        st: { name: 'Stone (st)', ratio: 6350.29318, system: 'imperial' }
+      }
+    },
+    volume: {
+      metricBase: 'ml',
+      units: {
+        ml: { name: 'Milliliters (ml)', ratio: 1, system: 'metric' },
+        l: { name: 'Liters (l)', ratio: 1000, system: 'metric' },
+        tsp: { name: 'Teaspoons (US tsp)', ratio: 4.92892, system: 'imperial' },
+        tbsp: { name: 'Tablespoons (US tbsp)', ratio: 14.7868, system: 'imperial' },
+        fl_oz: { name: 'Fluid Ounces (US fl oz)', ratio: 29.5735, system: 'imperial' },
+        cup: { name: 'Cups (US cup)', ratio: 240, system: 'imperial' },
+        pt: { name: 'Pints (US pt)', ratio: 473.176, system: 'imperial' },
+        qt: { name: 'Quarts (US qt)', ratio: 946.353, system: 'imperial' },
+        gal: { name: 'Gallons (US gal)', ratio: 3785.41, system: 'imperial' }
+      }
+    },
+    temperature: {
+      type: 'temperature',
+      units: {
+        c: { name: 'Celsius (°C)', system: 'metric' },
+        f: { name: 'Fahrenheit (°F)', system: 'imperial' }
+      }
+    }
+  };
 }
 
-body {
-  position: relative;
-  background-color: #0d1117;
-  color: #333333;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  padding: 16px;
-  overflow-x: hidden;
+// LOGIC: Performs unit conversion computations between metric and imperial systems
+function calculateConversion(categoryKey, fromUnitKey, toUnitKey, value) {
+  const data = getConversionData();
+  const category = data[categoryKey];
+  
+  if (value === '' || isNaN(value)) {
+    return { result: '', formula: '' };
+  }
+
+  const numValue = parseFloat(value);
+
+  if (category.type === 'temperature') {
+    if (fromUnitKey === 'c' && toUnitKey === 'f') {
+      const res = (numValue * 9 / 5) + 32;
+      return { result: res, formula: `(${numValue} °C × 9/5) + 32 = ${res.toFixed(2)} °F` };
+    } else if (fromUnitKey === 'f' && toUnitKey === 'c') {
+      const res = (numValue - 32) * 5 / 9;
+      return { result: res, formula: `(${numValue} °F - 32) × 5/9 = ${res.toFixed(2)} °C` };
+    }
+    return { result: numValue, formula: `${numValue} = ${numValue}` };
+  }
+
+  const fromUnit = category.units[fromUnitKey];
+  const toUnit = category.units[toUnitKey];
+
+  const valueInBase = numValue * fromUnit.ratio;
+  const convertedValue = valueInBase / toUnit.ratio;
+
+  return {
+    result: convertedValue,
+    formula: `1 ${fromUnitKey} = ${(fromUnit.ratio / toUnit.ratio).toFixed(6)} ${toUnitKey}`
+  };
 }
 
-.video-background {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  width: 100vw;
-  height: 100vh;
-  transform: translate(-50%, -50%);
-  z-index: 0;
-  pointer-events: none;
-  overflow: hidden;
+// DISPLAY: Manages DOM elements, event listeners, user interaction, and updates the UI
+function initializeDisplay() {
+  const data = getConversionData();
+  
+  const categorySelect = document.getElementById('category-select');
+  const directionBtn = document.getElementById('direction-btn');
+  const directionLabel = document.getElementById('direction-label');
+  const fromUnitSelect = document.getElementById('from-unit-select');
+  const toUnitSelect = document.getElementById('to-unit-select');
+  const valueInput = document.getElementById('value-input');
+  const resultDisplay = document.getElementById('result-display');
+  const formulaDisplay = document.getElementById('formula-display');
+
+  let currentDirection = 'metricToImperial';
+
+  Object.keys(data).forEach(cat => {
+    const option = document.createElement('option');
+    option.value = cat;
+    option.textContent = cat.charAt(0).toUpperCase() + cat.slice(1);
+    categorySelect.appendChild(option);
+  });
+
+  function populateUnits() {
+    const categoryKey = categorySelect.value;
+    const category = data[categoryKey];
+    
+    fromUnitSelect.innerHTML = '';
+    toUnitSelect.innerHTML = '';
+
+    const sourceSystem = currentDirection === 'metricToImperial' ? 'metric' : 'imperial';
+    const targetSystem = currentDirection === 'metricToImperial' ? 'imperial' : 'metric';
+
+    Object.keys(category.units).forEach(unitKey => {
+      const unit = category.units[unitKey];
+      if (unit.system === sourceSystem) {
+        const option = document.createElement('option');
+        option.value = unitKey;
+        option.textContent = unit.name;
+        fromUnitSelect.appendChild(option);
+      }
+      if (unit.system === targetSystem) {
+        const option = document.createElement('option');
+        option.value = unitKey;
+        option.textContent = unit.name;
+        toUnitSelect.appendChild(option);
+      }
+    });
+
+    updateResult();
+  }
+
+  function updateResult() {
+    const categoryKey = categorySelect.value;
+    const fromUnitKey = fromUnitSelect.value;
+    const toUnitKey = toUnitSelect.value;
+    const value = valueInput.value;
+
+    if (!fromUnitKey || !toUnitKey) {
+      resultDisplay.textContent = '-';
+      formulaDisplay.textContent = '';
+      return;
+    }
+
+    const { result, formula } = calculateConversion(categoryKey, fromUnitKey, toUnitKey, value);
+
+    if (result === '') {
+      resultDisplay.textContent = '-';
+      formulaDisplay.textContent = '';
+    } else {
+      const formattedResult = Number.isInteger(result) ? result : parseFloat(result.toFixed(4));
+      resultDisplay.textContent = `${formattedResult} ${toUnitKey}`;
+      formulaDisplay.textContent = formula;
+    }
+  }
+
+  directionBtn.addEventListener('click', () => {
+    if (currentDirection === 'metricToImperial') {
+      currentDirection = 'imperialToMetric';
+      directionLabel.textContent = 'Imperial → Metric';
+    } else {
+      currentDirection = 'metricToImperial';
+      directionLabel.textContent = 'Metric → Imperial';
+    }
+    populateUnits();
+  });
+
+  categorySelect.addEventListener('change', populateUnits);
+  fromUnitSelect.addEventListener('change', updateResult);
+  toUnitSelect.addEventListener('change', updateResult);
+  valueInput.addEventListener('input', updateResult);
+
+  document.body.addEventListener('click', () => {
+    const iframe = document.getElementById('bg-video');
+    if (iframe && iframe.contentWindow) {
+      iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
+    }
+  }, { once: true });
+
+  populateUnits();
 }
 
-.video-background iframe {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 100vw;
-  height: 56.25vw;
-  min-height: 100vh;
-  min-width: 177.77vh;
-  transform: translate(-50%, -50%);
-  opacity: 0.65;
-  filter: brightness(0.85);
-}
-
-.card {
-  position: relative;
-  z-index: 10;
-  background-color: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  width: 100%;
-  max-width: 420px;
-  padding: 24px;
-  border-radius: 16px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-}
-
-h1 {
-  font-size: 1.5rem;
-  text-align: center;
-  margin-bottom: 20px;
-  color: #1a1a1a;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  margin-bottom: 16px;
-}
-
-label {
-  font-size: 0.85rem;
-  font-weight: 600;
-  margin-bottom: 6px;
-  color: #444444;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-select, input {
-  width: 100%;
-  padding: 12px;
-  font-size: 1rem;
-  border: 1px solid #cccccc;
-  border-radius: 8px;
-  background-color: rgba(255, 255, 255, 0.9);
-  outline: none;
-  transition: border-color 0.2s, background-color 0.2s;
-}
-
-select:focus, input:focus {
-  border-color: #0066cc;
-  background-color: #ffffff;
-}
-
-.direction-container {
-  margin-bottom: 16px;
-}
-
-.direction-btn {
-  width: 100%;
-  padding: 10px 16px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: #0066cc;
-  background-color: #e6f0fa;
-  border: 1px solid #b3d1ff;
-  border-radius: 8px;
-  cursor: pointer;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 8px;
-  transition: background-color 0.2s;
-}
-
-.direction-btn:hover {
-  background-color: #d8e8fa;
-}
-
-.swap-icon {
-  font-size: 1.1rem;
-}
-
-.converter-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-.result-box {
-  margin-top: 8px;
-  padding: 16px;
-  background-color: rgba(240, 247, 255, 0.95);
-  border-radius: 8px;
-  border: 1px solid #d0e3ff;
-  text-align: center;
-}
-
-.result-label {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: #005522;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 4px;
-}
-
-.result-value {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #004488;
-  word-break: break-word;
-}
-
-.result-formula {
-  font-size: 0.8rem;
-  color: #666666;
-  margin-top: 4px;
-}
+document.addEventListener('DOMContentLoaded', initializeDisplay);
